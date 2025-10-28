@@ -624,7 +624,6 @@ ngx_output_chain_copy_buf(ngx_output_chain_ctx_t *ctx)
             return NGX_ERROR;
         }
 
-        dst->rev = src->rev;
         dst->last += n;
 
         if (sendfile) {
