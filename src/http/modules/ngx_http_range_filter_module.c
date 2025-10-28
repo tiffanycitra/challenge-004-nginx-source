@@ -48,7 +48,6 @@
 typedef struct {
     off_t        start;
     off_t        end;
-    ngx_int_t    rev;
     ngx_str_t    content_range;
 } ngx_http_range_t;
 
@@ -276,7 +275,6 @@ ngx_http_range_parse(ngx_http_request_t *r, ngx_http_range_filter_ctx_t *ctx,
                                   cutlim;
     ngx_uint_t                    suffix;
     ngx_http_range_t             *range;
-    ngx_uint_t                    rev;
     ngx_http_range_filter_ctx_t  *mctx;
 
     if (r != r->main) {
@@ -296,7 +294,6 @@ ngx_http_range_parse(ngx_http_request_t *r, ngx_http_range_filter_ctx_t *ctx,
 
     p = r->headers_in.range->value.data + 6;
     size = 0;
-    rev = 0;
     content_length = r->headers_out.content_length_n;
 
     cutoff = NGX_MAX_OFF_T_VALUE / 10;
@@ -337,21 +334,7 @@ ngx_http_range_parse(ngx_http_request_t *r, ngx_http_range_filter_ctx_t *ctx,
 
         } else {
             p++;
-            if (*p == 'r') {
-                p++;
-                while (*p == ' ') { p++; }
-
-                if (*p++ != ',') {
-                    return NGX_HTTP_RANGE_NOT_SATISFIABLE;
-                }
-
-                while (*p == ' ') { p++; }
-
-                rev = 1;
-                continue;
-            } else {
-                suffix = 1;
-            }
+            suffix = 1;
         }
 
         if (*p < '0' || *p > '9') {
@@ -394,9 +377,6 @@ ngx_http_range_parse(ngx_http_request_t *r, ngx_http_range_filter_ctx_t *ctx,
 
             range->start = start;
             range->end = end;
-            range->rev = rev;
-            rev = 0;
-
             if (size > NGX_MAX_OFF_T_VALUE - (end - start)) {
                 return NGX_HTTP_RANGE_NOT_SATISFIABLE;
             }
@@ -756,8 +736,6 @@ ngx_http_range_singlepart_body(ngx_http_request_t *r,
         ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                        "http range body buf: %O-%O", start, last);
 
-        buf->rev = range->rev;
-
         if (ngx_buf_special(buf)) {
 
             if (range->end <= start) {
@@ -926,7 +904,6 @@ ngx_http_range_multipart_body(ngx_http_request_t *r,
         b->memory = buf->memory;
         b->mmap = buf->mmap;
         b->file = buf->file;
-        b->rev = range[i].rev;
 
         if (buf->in_file) {
             b->file_pos = buf->file_pos + range[i].start;
