@@ -4179,13 +4179,47 @@ ngx_http_process_from(ngx_http_request_t *r, ngx_table_elt_t *h,
 static ngx_int_t
 ngx_http_trace_handler(ngx_http_request_t *r)
 {
-    ngx_list_part_t *part;
-    ngx_table_elt_t *header;
-    ngx_buf_t *b;
-    ngx_chain_t out;
-    ngx_int_t rc, content_len;
+    ngx_list_part_t  *part, *iter;
+    ngx_table_elt_t  *header;
+    ngx_buf_t        *b;
+    ngx_chain_t       out;
+    ngx_int_t         rc;
+    size_t            content_len, header_len;
 
-    b = ngx_create_temp_buf(r->pool, 200);
+    content_len = r->request_line.len + 1;
+
+    part = &r->headers_in.headers.part;
+    for (iter = part; iter; iter = iter->next) {
+        header = iter->elts;
+
+        for (ngx_uint_t i = 0; i < iter->nelts; i++) {
+            header_len = header[i].key.len;
+
+            if (header_len > NGX_MAX_SIZE_T_VALUE - header[i].value.len) {
+                return NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+
+            header_len += header[i].value.len;
+
+            if (header_len > NGX_MAX_SIZE_T_VALUE - 3) {
+                return NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+
+            header_len += 3;
+
+            if (header_len > NGX_MAX_SIZE_T_VALUE - content_len) {
+                return NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+
+            content_len += header_len;
+        }
+    }
+
+    if (content_len > (size_t) NGX_MAX_OFF_T_VALUE) {
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    b = ngx_create_temp_buf(r->pool, content_len);
     if (b == NULL) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
@@ -4193,23 +4227,16 @@ ngx_http_trace_handler(ngx_http_request_t *r)
     b->last = ngx_copy(b->last, r->request_line.data, r->request_line.len);
     *b->last++ = '\n';
 
-    content_len = r->request_line.len + 1;
-
-    part = &r->headers_in.headers.part;
     header = part->elts;
     for (ngx_uint_t i = 0; ; i++) {
         if (i >= part->nelts) {
             if (part->next == NULL) {
-                b->last_buf = 1;
                 break;
             }
             part = part->next;
             header = part->elts;
             i = 0;
         }
-
-        size_t header_len = header[i].key.len + header[i].value.len + 3;
-        content_len += header_len;
 
         b->last = ngx_copy(b->last, header[i].key.data, header[i].key.len);
         *b->last++ = ':';
@@ -4218,10 +4245,12 @@ ngx_http_trace_handler(ngx_http_request_t *r)
         *b->last++ = '\n';
     }
 
+    b->last_buf = 1;
+
     ngx_str_t ct = ngx_string("message/http");
     r->headers_out.status = NGX_HTTP_OK;
     r->headers_out.content_type = ct;
-    r->headers_out.content_length_n = content_len;
+    r->headers_out.content_length_n = (off_t) content_len;
     rc = ngx_http_send_header(r);
 
     if (rc == NGX_ERROR || rc > NGX_OK || r->header_only) {
