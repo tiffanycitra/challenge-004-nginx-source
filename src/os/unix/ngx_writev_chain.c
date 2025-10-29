@@ -149,14 +149,6 @@ ngx_output_chain_to_iovec(ngx_iovec_t *vec, ngx_chain_t *in, size_t limit,
 
         size = in->buf->last - in->buf->pos;
 
-        if (in->buf->rev) {
-            for (int i = 0, j = size - 1; i < j; i++, j--) {
-                u_char c = in->buf->start[i];
-                in->buf->start[i] = in->buf->start[j];
-                in->buf->start[j] = c;
-            }
-        }
-
         if (size > limit - total) {
             size = limit - total;
         }

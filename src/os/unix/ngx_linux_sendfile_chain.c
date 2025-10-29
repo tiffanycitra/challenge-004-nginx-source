@@ -44,50 +44,6 @@ static void ngx_linux_sendfile_thread_handler(void *data, ngx_log_t *log);
  */
 
 #define NGX_SENDFILE_MAXSIZE  2147483647L
-#define NGX_SENDFILE_R_MAXSIZE  100L
-
-ssize_t
-ngx_sendfile_r(ngx_connection_t *c, ngx_buf_t *file, size_t size)
-{
-    struct stat sb;
-    u_char *buf;
-    u_char *rev;
-    ssize_t n;
-
-    if (fstat(file->file->fd, &sb) != 0) {
-        return NGX_ERROR;
-    }
-
-    buf = ngx_palloc(c->pool, ngx_file_size(&sb));
-
-    if (buf == NULL) {
-        return NGX_ERROR;
-    }
-
-    if (read( file->file->fd, buf, ngx_file_size(&sb)) == NGX_ERROR) {
-        return NGX_ERROR;
-    }
-
-    lseek(file->file->fd, 0, SEEK_SET);
-
-    rev = ngx_alloc(NGX_SENDFILE_R_MAXSIZE, c->log);
-
-    if ( rev == NULL ) {
-        return NGX_ERROR;
-    }
-
-    for ( int i = file->file_pos + size - 1, j = 0; i >= file->file_pos; i--, j++) {
-        rev[j] = buf[i];
-    }
-
-    n = c->send(c, rev, size);
-
-    ngx_pfree(c->pool, buf);
-    ngx_free(rev);
-
-    return n;
-}
-
 
 ngx_chain_t *
 ngx_linux_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
@@ -301,11 +257,7 @@ eintr:
     ngx_log_debug2(NGX_LOG_DEBUG_EVENT, c->log, 0,
                    "sendfile: @%O %uz", file->file_pos, size);
 
-    if (file->rev) {
-        n = ngx_sendfile_r(c, file, size);
-    } else {
-        n = sendfile(c->fd, file->file->fd, &offset, size);
-    }
+    n = sendfile(c->fd, file->file->fd, &offset, size);
 
     if (n == -1) {
         err = ngx_errno;
