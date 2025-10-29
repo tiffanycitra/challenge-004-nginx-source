@@ -4933,9 +4933,8 @@ static ngx_int_t
 ngx_http_proxy_merge_ssl(ngx_conf_t *cf, ngx_http_proxy_loc_conf_t *conf,
     ngx_http_proxy_loc_conf_t *prev)
 {
-    ngx_uint_t  preserve;
-
-    if (conf->ssl_protocols == 0
+    if (!conf->ssl
+        && conf->ssl_protocols == 0
         && conf->ssl_ciphers.data == NULL
         && conf->upstream.ssl_certificate == NGX_CONF_UNSET_PTR
         && conf->upstream.ssl_certificate_key == NGX_CONF_UNSET_PTR
@@ -4947,32 +4946,18 @@ ngx_http_proxy_merge_ssl(ngx_conf_t *cf, ngx_http_proxy_loc_conf_t *conf,
         && conf->upstream.ssl_session_reuse == NGX_CONF_UNSET
         && conf->ssl_conf_commands == NGX_CONF_UNSET_PTR)
     {
-        if (prev->upstream.ssl) {
-            conf->upstream.ssl = prev->upstream.ssl;
-            return NGX_OK;
-        }
-
-        preserve = 1;
-
-    } else {
-        preserve = 0;
+        conf->upstream.ssl = prev->upstream.ssl;
+        return NGX_OK;
     }
 
-    conf->upstream.ssl = ngx_pcalloc(cf->pool, sizeof(ngx_ssl_t));
     if (conf->upstream.ssl == NULL) {
-        return NGX_ERROR;
+        conf->upstream.ssl = ngx_pcalloc(cf->pool, sizeof(ngx_ssl_t));
+        if (conf->upstream.ssl == NULL) {
+            return NGX_ERROR;
+        }
     }
 
     conf->upstream.ssl->log = cf->log;
-
-    /*
-     * special handling to preserve conf->upstream.ssl
-     * in the "http" section to inherit it to all servers
-     */
-
-    if (preserve) {
-        prev->upstream.ssl = conf->upstream.ssl;
-    }
 
     return NGX_OK;
 }
