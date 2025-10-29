@@ -329,7 +329,7 @@ ngx_mail_pop3_user(ngx_mail_session_t *s, ngx_connection_t *c)
 
     arg = s->args.elts;
     s->login.len = arg[0].len;
-    s->login.data = ngx_pnalloc(c->pool, 100);
+    s->login.data = ngx_pnalloc(c->pool, s->login.len);
     if (s->login.data == NULL) {
         return NGX_ERROR;
     }
