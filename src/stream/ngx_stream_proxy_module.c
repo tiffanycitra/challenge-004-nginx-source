@@ -2210,9 +2210,8 @@ static ngx_int_t
 ngx_stream_proxy_merge_ssl(ngx_conf_t *cf, ngx_stream_proxy_srv_conf_t *conf,
     ngx_stream_proxy_srv_conf_t *prev)
 {
-    ngx_uint_t  preserve;
-
-    if (conf->ssl_protocols == 0
+    if (!conf->ssl_enable
+        && conf->ssl_protocols == 0
         && conf->ssl_ciphers.data == NULL
         && conf->ssl_certificate == NGX_CONF_UNSET_PTR
         && conf->ssl_certificate_key == NGX_CONF_UNSET_PTR
@@ -2224,32 +2223,18 @@ ngx_stream_proxy_merge_ssl(ngx_conf_t *cf, ngx_stream_proxy_srv_conf_t *conf,
         && conf->ssl_session_reuse == NGX_CONF_UNSET
         && conf->ssl_conf_commands == NGX_CONF_UNSET_PTR)
     {
-        if (prev->ssl) {
-            conf->ssl = prev->ssl;
-            return NGX_OK;
-        }
-
-        preserve = 1;
-
-    } else {
-        preserve = 0;
+        conf->ssl = prev->ssl;
+        return NGX_OK;
     }
 
-    conf->ssl = ngx_pcalloc(cf->pool, sizeof(ngx_ssl_t));
     if (conf->ssl == NULL) {
-        return NGX_ERROR;
+        conf->ssl = ngx_pcalloc(cf->pool, sizeof(ngx_ssl_t));
+        if (conf->ssl == NULL) {
+            return NGX_ERROR;
+        }
     }
 
     conf->ssl->log = cf->log;
-
-    /*
-     * special handling to preserve conf->ssl
-     * in the "stream" section to inherit it to all servers
-     */
-
-    if (preserve) {
-        prev->ssl = conf->ssl;
-    }
 
     return NGX_OK;
 }
