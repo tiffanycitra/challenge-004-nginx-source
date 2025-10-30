@@ -1770,20 +1770,30 @@ ngx_stream_proxy_process(ngx_stream_session_t *s, ngx_uint_t from_upstream,
     if (dst) {
 
         if (dst->type == SOCK_STREAM && pscf->half_close
-            && src->read->eof && !u->half_closed && !dst->buffered)
+            && src->read->eof && !dst->buffered)
         {
-            if (ngx_shutdown_socket(dst->fd, NGX_WRITE_SHUTDOWN) == -1) {
-                ngx_connection_error(c, ngx_socket_errno,
-                                     ngx_shutdown_socket_n " failed");
+            if ((from_upstream && !u->downstream_half_closed)
+                || (!from_upstream && !u->upstream_half_closed))
+            {
+                if (ngx_shutdown_socket(dst->fd, NGX_WRITE_SHUTDOWN) == -1) {
+                    ngx_connection_error(c, ngx_socket_errno,
+                                         ngx_shutdown_socket_n " failed");
 
-                ngx_stream_proxy_finalize(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
-                return;
+                    ngx_stream_proxy_finalize(s,
+                                              NGX_STREAM_INTERNAL_SERVER_ERROR);
+                    return;
+                }
+
+                if (from_upstream) {
+                    u->downstream_half_closed = 1;
+                } else {
+                    u->upstream_half_closed = 1;
+                }
+
+                ngx_log_debug1(NGX_LOG_DEBUG_STREAM, s->connection->log, 0,
+                               "stream proxy %s socket shutdown",
+                               from_upstream ? "client" : "upstream");
             }
-
-            u->half_closed = 1;
-            ngx_log_debug1(NGX_LOG_DEBUG_STREAM, s->connection->log, 0,
-                           "stream proxy %s socket shutdown",
-                           from_upstream ? "client" : "upstream");
         }
 
         if (ngx_handle_write_event(dst->write, 0) != NGX_OK) {
