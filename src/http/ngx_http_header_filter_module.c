@@ -435,6 +435,12 @@ ngx_http_header_filter(ngx_http_request_t *r)
                + sizeof(CRLF) - 1;
     }
 
+    if (r->headers_in.prefer) {
+        len += sizeof("Prefer: ") - 1
+               + r->headers_in.prefer->value.len
+               + sizeof(CRLF) - 1;
+    }
+
     b = ngx_create_temp_buf(r->pool, len);
     if (b == NULL) {
         return NGX_ERROR;
@@ -562,10 +568,6 @@ ngx_http_header_filter(ngx_http_request_t *r)
     if (r->chunked) {
         b->last = ngx_cpymem(b->last, "Transfer-Encoding: chunked" CRLF,
                              sizeof("Transfer-Encoding: chunked" CRLF) - 1);
-    }
-
-    if (r->headers_in.prefer) {
-        len += sizeof("Prefer: " CRLF) + r->headers_in.prefer->value.len;
     }
 
     if (r->headers_out.status == NGX_HTTP_SWITCHING_PROTOCOLS) {
