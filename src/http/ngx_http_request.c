@@ -4007,32 +4007,17 @@ static ngx_int_t
 ngx_http_process_prefer(ngx_http_request_t *r, ngx_table_elt_t *h,
     ngx_uint_t offset)
 {
-    ngx_table_elt_t *p;
-
     if (r->headers_in.prefer) {
         ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
-                      "client sent duplicate host header: \"%V: %V\", "
+                      "client sent duplicate prefer header: \"%V: %V\", "
                       "previous value: \"%V: %V\"",
                       &h->key, &h->value, &r->headers_in.prefer->key,
                       &r->headers_in.prefer->value);
-        ngx_free(r->headers_in.prefer);
         return NGX_OK;
     }
 
-    p = ngx_alloc(sizeof(ngx_table_elt_t), r->connection->log);
-
-    if (!p) {
-        ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
-        return NGX_ERROR;
-    }
-
-    p->hash = h->hash;
-    p->key.len = h->key.len;
-    p->key.data = h->key.data;
-    p->value.len = h->value.len;
-    p->value.data = h->value.data;
-
-    r->headers_in.prefer = p;
+    r->headers_in.prefer = h;
+    h->next = NULL;
 
     return NGX_OK;
 }
