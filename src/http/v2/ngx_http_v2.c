@@ -673,18 +673,14 @@ ngx_http_v2_handle_connection(ngx_http_v2_connection_t *h2c)
         return;
     }
 
-    clcf = ngx_http_get_module_loc_conf(h2c->http_connection->conf_ctx,
-                                        ngx_http_core_module);
-
-    if (!c->read->timer_set) {
-        ngx_add_timer(c->read, clcf->keepalive_timeout);
-    }
-
     ngx_reusable_connection(c, 1);
 
     if (h2c->state.incomplete) {
         return;
     }
+
+    clcf = ngx_http_get_module_loc_conf(h2c->http_connection->conf_ctx,
+                                        ngx_http_core_module);
 
     ngx_destroy_pool(h2c->pool);
 
@@ -703,6 +699,10 @@ ngx_http_v2_handle_connection(ngx_http_v2_connection_t *h2c)
 
     c->write->handler = ngx_http_empty_handler;
     c->read->handler = ngx_http_v2_idle_handler;
+
+    if (!c->read->timer_set) {
+        ngx_add_timer(c->read, clcf->keepalive_timeout);
+    }
 
     if (c->write->timer_set) {
         ngx_del_timer(c->write);
@@ -4857,6 +4857,10 @@ ngx_http_v2_idle_handler(ngx_event_t *rev)
     }
 
     c->write->handler = ngx_http_v2_write_handler;
+
+    if (rev->timer_set) {
+        ngx_del_timer(rev);
+    }
 
     rev->handler = ngx_http_v2_read_handler;
     ngx_http_v2_read_handler(rev);
